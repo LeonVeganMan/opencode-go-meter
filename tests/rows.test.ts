@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test"
-import { buildRows } from "../src/rows"
+import { buildRows, orderRows } from "../src/rows"
+import { DEFAULTS, mergeConfig } from "../src/config"
 import type { Usage } from "../src/usage"
 
 const at = (s: string) => new Date(s)
@@ -10,7 +11,9 @@ const usage: Usage = {
 }
 
 test("a row carries every figure the render path needs", () => {
-  expect(buildRows(usage, at("2026-10-13T09:20:00Z"))[2]).toEqual({
+  const rows = buildRows(usage, DEFAULTS, at("2026-10-13T09:20:00Z"))
+  expect(rows.map((row) => row.label)).toEqual(["5h", "weekly", "monthly"])
+  expect(rows[2]).toEqual({
     label: "monthly",
     percent: 14,
     reset: "28d 4h",
@@ -21,7 +24,7 @@ test("a row carries every figure the render path needs", () => {
 })
 
 test("the rolling window is the short one", () => {
-  expect(buildRows(usage, at("2026-10-13T09:20:00Z"))[0]).toEqual({
+  expect(buildRows(usage, DEFAULTS, at("2026-10-13T09:20:00Z"))[0]).toEqual({
     label: "5h",
     percent: 20,
     reset: "2h 55m",
@@ -31,8 +34,19 @@ test("the rolling window is the short one", () => {
   })
 })
 
+test("no projection becomes zero, never a flag", () => {
+  const young = buildRows(usage, mergeConfig({ projectionMinElapsed: 99 }), at("2026-10-13T09:20:00Z"))
+  expect(young.map((row) => row.projected)).toEqual([0, 0, 0])
+})
+
+test("projection order puts the worst first and keeps the rest stable", () => {
+  const rows = buildRows(usage, DEFAULTS, at("2026-10-13T09:20:00Z"))
+  expect(orderRows(rows, "projection").map((row) => row.label)).toEqual(["monthly", "weekly", "5h"])
+  expect(orderRows(rows, "fixed").map((row) => row.label)).toEqual(["5h", "weekly", "monthly"])
+})
+
 test("the rows keep the fixed order and a window the payload left out is skipped", () => {
   const { weekly, ...withoutWeekly } = usage
-  expect(buildRows(usage, at("2026-10-13T09:20:00Z")).map((row) => row.label)).toEqual(["5h", "weekly", "monthly"])
-  expect(buildRows(withoutWeekly, at("2026-10-13T09:20:00Z")).map((row) => row.label)).toEqual(["5h", "monthly"])
+  expect(buildRows(usage, DEFAULTS, at("2026-10-13T09:20:00Z")).map((row) => row.label)).toEqual(["5h", "weekly", "monthly"])
+  expect(buildRows(withoutWeekly, DEFAULTS, at("2026-10-13T09:20:00Z")).map((row) => row.label)).toEqual(["5h", "monthly"])
 })

@@ -1,6 +1,7 @@
 import { countdown, elapsedSpan, humanize, projected, remaining } from "./windows"
 import type { Win } from "./windows"
 import type { Usage } from "./usage"
+import type { Config } from "./config"
 
 export type Row = {
   label: string
@@ -18,10 +19,7 @@ export const WINDOWS: { label: string; key: Win }[] = [
   { label: "monthly", key: "monthly" },
 ]
 
-// Below this much of the window elapsed a projection is noise, not signal.
-const MIN_ELAPSED_PCT = 5
-
-export function buildRows(usage: Usage, now: Date = new Date()): Row[] {
+export function buildRows(usage: Usage, cfg: Config, now: Date = new Date()): Row[] {
   const rows: Row[] = []
   for (const { label, key } of WINDOWS) {
     const usageWindow = usage[key]
@@ -32,9 +30,16 @@ export function buildRows(usage: Usage, now: Date = new Date()): Row[] {
       percent: usageWindow.percent,
       reset: countdown(usageWindow.resetsAt, now),
       remaining: remaining(usageWindow.resetsAt, now),
-      projected: projected(key, usageWindow.resetsAt, usageWindow.percent, MIN_ELAPSED_PCT, now) ?? 0,
+      projected: projected(key, usageWindow.resetsAt, usageWindow.percent, cfg.projectionMinElapsed, now) ?? 0,
       span: `${humanize(elapsed)} of ${humanize(total)}`,
     })
   }
   return rows
+}
+
+// "projection" puts the window closest to saturating first. The sort is stable,
+// so windows that forecast the same land keep the order WINDOWS lists them in.
+export function orderRows(rows: Row[], order: Config["order"]): Row[] {
+  if (order === "fixed") return [...rows]
+  return [...rows].sort((a, b) => b.projected - a.projected)
 }

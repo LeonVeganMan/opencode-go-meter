@@ -30,7 +30,7 @@ const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" 
 async function readRows(): Promise<Row[]> {
   const key = await readAuthKey()
   const usage = key ? await fetchUsage(key) : null
-  return usage ? buildRows(usage) : []
+  return usage ? buildRows(usage, await loadConfig()) : []
 }
 
 function thresholdColor(theme: any, percent: number): string {
