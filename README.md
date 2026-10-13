@@ -71,9 +71,39 @@ is attempted, because a burst right after a reset would project to thousands.
 3. In the dialog that opens, click the `Settings` row at the bottom.
 4. Click a row to move it to its next value; `config.json` is written immediately.
 
-The panel is only reachable through that dialog, so turning both `sidebar` and `footer` off leaves
-you with no way in: from then on edit `config.json` by hand (one key is enough — everything else
-keeps its default).
+The panel lives in that dialog, so with both `sidebar` and `footer` off there would be no way in. In
+that case a single muted `go-meter` word stays in the footer as the door: click it to open the
+dialog, then `Settings`. Editing `config.json` by hand works just as well — one key is enough,
+everything else keeps its default.
+
+### Clicking
+
+| Where | What it does |
+| --- | --- |
+| `Context & Go`, the sidebar title | Opens the info dialog |
+| Any row under the title (`context`, `5h`, `weekly`, `monthly`) | Opens the same info dialog |
+| The `Settings` row at the bottom of the dialog | Opens the options panel |
+| Any row in the panel | Moves that option to its next value and saves it immediately |
+| The closing line of the dialog | Closes it (`esc` may work too, the click always does) |
+| `go-meter`, the word left in the footer when both views are off | Opens the info dialog |
+
+The click target is the whole row, not just the text.
+
+## Screenshots
+
+Sidebar — the context row and the three plan windows. The `(!)` marks a window whose current pace
+saturates it before the reset, and that window's bar takes the alert colour with it:
+
+![Sidebar](assets/sidebar.png)
+
+Status line — the same context figures, then the plan percentages, and the `(!)` when a window is
+heading for its limit:
+
+![Status line](assets/statusbar.png)
+
+The info dialog, opened by clicking the title or any row, with the `Settings` row at the bottom:
+
+![Info dialog](assets/dialog.png)
 
 ## Options
 

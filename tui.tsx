@@ -345,6 +345,7 @@ export default Plugin.define({
     // nothing still leaves an empty line where its block would have been.
     let sidebarSlot: (() => void) | undefined
     let footerSlot: (() => void) | undefined
+    let handleSlot: (() => void) | undefined
     const syncSlots = (config: Config) => {
       if (config.sidebar && !sidebarSlot) {
         // Sidebar: one title, then one row per figure. A failed call to the endpoint
@@ -399,6 +400,27 @@ export default Plugin.define({
       } else if (!config.footer && footerSlot) {
         footerSlot()
         footerSlot = undefined
+      }
+      // With nothing on screen there is no way into the dialog, and the panel lives in
+      // it, so one muted word stays behind as the door. A slot is the verified way in: a
+      // keybind would need a chord whose syntax cannot be confirmed here, and a rejected
+      // command list throws while the plugin is still setting up.
+      const needsHandle = !config.sidebar && !config.footer
+      if (needsHandle && !handleSlot) {
+        handleSlot = context.ui.slot({
+          append: "prompt.footer.status",
+          render: (props: any) => {
+            sessionID = props.sessionID
+            return (
+              <text fg={muted()} onMouseUp={() => openDetail(props.sessionID)}>
+                {"go-meter"}
+              </text>
+            )
+          },
+        })
+      } else if (!needsHandle && handleSlot) {
+        handleSlot()
+        handleSlot = undefined
       }
     }
 
@@ -459,6 +481,7 @@ export default Plugin.define({
       if (rowsTimer) clearInterval(rowsTimer)
       sidebarSlot?.()
       footerSlot?.()
+      handleSlot?.()
       footerShortcuts?.()
     }
   },
