@@ -232,3 +232,10 @@ export async function saveConfig(cfg: Config, path: string = configPath()): Prom
     // A config that cannot be written still leaves the running session correct.
   }
 }
+
+// Whether the plan figures are worth fetching at all: something has to be able to
+// show them, or to announce them. Both views off with no dialog means the endpoint
+// is never called.
+export function pollingNeeded(cfg: Config): boolean {
+  return cfg.sidebar || cfg.footer || cfg.autoOpen
+}

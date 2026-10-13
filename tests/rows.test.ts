@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test"
-import { buildRows, orderRows } from "../src/rows"
+import { alerting, buildRows, orderRows } from "../src/rows"
 import { DEFAULTS, mergeConfig } from "../src/config"
 import type { Usage } from "../src/usage"
 
@@ -39,6 +39,14 @@ test("no projection becomes zero, never a flag", () => {
   expect(young.map((row) => row.projected)).toEqual([0, 0, 0])
 })
 
+test("a forecast breach is an alert, exactly at the limit is not", () => {
+  const monthly = buildRows(usage, DEFAULTS, at("2026-10-13T09:20:00Z")).find((r) => r.label === "monthly")!
+  expect(alerting(monthly, DEFAULTS)).toBe(true)
+  expect(alerting({ ...monthly, projected: 101 }, DEFAULTS)).toBe(true)
+  expect(alerting({ ...monthly, projected: 100 }, DEFAULTS)).toBe(false)
+  expect(alerting({ ...monthly, projected: 70 }, mergeConfig({ autoOpenAt: 50 }))).toBe(true)
+  expect(alerting({ ...monthly, projected: 40 }, mergeConfig({ autoOpenAt: 50 }))).toBe(false)
+})
 test("projection order puts the worst first and keeps the rest stable", () => {
   const rows = buildRows(usage, DEFAULTS, at("2026-10-13T09:20:00Z"))
   expect(orderRows(rows, "projection").map((row) => row.label)).toEqual(["monthly", "weekly", "5h"])

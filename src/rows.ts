@@ -43,3 +43,10 @@ export function orderRows(rows: Row[], order: Config["order"]): Row[] {
   if (order === "fixed") return [...rows]
   return [...rows].sort((a, b) => b.projected - a.projected)
 }
+
+// One predicate for every "this window is in trouble" decision: the row colour, the
+// (!) flag and the dialog that opens by itself all read it, so they cannot disagree.
+// The breach has to be forecast past the limit, exactly at it is not an alert.
+export function alerting(row: Row, cfg: Config): boolean {
+  return row.projected > cfg.autoOpenAt
+}

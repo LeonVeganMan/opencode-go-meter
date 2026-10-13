@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test"
-import { DEFAULTS, mergeConfig, cycleOption } from "../src/config"
+import { DEFAULTS, mergeConfig, cycleOption, pollingNeeded } from "../src/config"
 
 test("missing keys fall back to the defaults", () => {
   expect(mergeConfig({})).toEqual(DEFAULTS)
@@ -31,4 +31,9 @@ test("cycling a counter steps and wraps", () => {
 test("cycling a column list toggles one entry", () => {
   expect(cycleOption(DEFAULTS, "columns.cost").columns.cost).toBe(false)
   expect(cycleOption(DEFAULTS, "autoOpenWindows.monthly").autoOpenWindows).toEqual(["5h", "weekly"])
+})
+test("nothing visible and no alert means no API calls", () => {
+  expect(pollingNeeded(mergeConfig({ sidebar: false, footer: false, autoOpen: false }))).toBe(false)
+  expect(pollingNeeded(mergeConfig({ sidebar: false, footer: false }))).toBe(true)
+  expect(pollingNeeded(DEFAULTS)).toBe(true)
 })

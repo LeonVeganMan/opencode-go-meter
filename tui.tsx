@@ -1,8 +1,8 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { Plugin } from "@opencode/plugin/tui"
-import { loadConfig } from "./src/config"
-import { buildRows, type Row } from "./src/rows"
+import { DEFAULTS, loadConfig, pollingNeeded, type Config, type Glyph } from "./src/config"
+import { alerting, buildRows, orderRows, type Row } from "./src/rows"
 import { fetchUsage, readAuthKey } from "./src/usage"
 
 // Local TUI plugin: one "Context & Go" block, the session's context usage as the
@@ -11,33 +11,37 @@ import { fetchUsage, readAuthKey } from "./src/usage"
 // ("-opencode.sidebar.context", "-opencode.prompt.footer") and the separate
 // go-usage plugin it used to be split across: a single file means a single label
 // column, so every bar starts on the same one.
-// The plan windows come from a remote API and move on a long cycle; the context
-// usage changes with every message, so it gets its own shorter tick.
-const REFRESH_MS = 60_000
-const CONTEXT_MS = 3_000
-const CELLS = 8
+//
+// Every figure is an option: the panel writes the same config.json a hand edit
+// does, and the file is re-read on a timer, so neither one needs a restart.
 // Every row is "[label padded to LABEL_WIDTH][bar]", so the bars line up.
 const LABEL_WIDTH = 8
-const FILLED = "\u2588"
-const EMPTY = "\u2591"
+// The bar glyphs: blocks by default, ascii for the fonts that draw the block
+// characters double width and push the row out of its column.
+const GLYPHS: Record<Glyph, { filled: string; empty: string }> = {
+  blocks: { filled: "\u2588", empty: "\u2591" },
+  ascii: { filled: "#", empty: "-" },
+}
 const TITLE = "Context & Go"
 const SHORT: Record<string, string> = { "5h": "5h", weekly: "w", monthly: "m" }
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 
+type Thresholds = Config["thresholds"]
+
 // The plan windows come from the usage endpoint this plugin reads itself, so the
 // figures and the countdown are the same ones src/windows.ts computes, without a
 // second implementation to keep in step.
-async function readRows(): Promise<Row[]> {
+async function readRows(config: Config): Promise<Row[]> {
   const key = await readAuthKey()
   const usage = key ? await fetchUsage(key) : null
-  return usage ? buildRows(usage, await loadConfig()) : []
+  return usage ? buildRows(usage, config) : []
 }
 
-function thresholdColor(theme: any, percent: number): string {
+function thresholdColor(theme: any, percent: number, thresholds: Thresholds): string {
   const f = theme?.text?.feedback ?? {}
   const pick = (c: any, fallback: string) => c?.base ?? c?.default ?? fallback
-  if (percent >= 90) return pick(f.error, "#ff6b6b")
-  if (percent >= 75) return pick(f.warning, "#ffcc66")
+  if (percent >= thresholds.error) return pick(f.error, "#ff6b6b")
+  if (percent >= thresholds.warning) return pick(f.warning, "#ffcc66")
   return pick(f.success, "#7fd37f")
 }
 
@@ -49,9 +53,10 @@ function compact(n: number): string {
   return n.toLocaleString("en-US")
 }
 
-function bar(percent: number): string {
-  const filled = Math.round((Math.max(0, Math.min(100, percent)) / 100) * CELLS)
-  return FILLED.repeat(filled) + EMPTY.repeat(CELLS - filled)
+function bar(percent: number, cells: number, glyphs: Glyph): string {
+  const { filled: on, empty: off } = GLYPHS[glyphs]
+  const filled = Math.round((Math.max(0, Math.min(100, percent)) / 100) * cells)
+  return on.repeat(filled) + off.repeat(cells - filled)
 }
 
 // Tokens after the percentage: the used tokens alone. The model's context window
@@ -63,8 +68,8 @@ function tokens(info: { used: number } | undefined): string {
 
 // A window that is close to its limit and resets within 24h is worth flagging:
 // the countdown then carries the threshold colour instead of muted.
-function resetImminent(row: Row): boolean {
-  return row.percent >= 75 && row.remaining < 86_400
+function resetImminent(row: Row, thresholds: Thresholds): boolean {
+  return row.percent >= thresholds.warning && row.remaining < 86_400
 }
 
 // Where the pace seen so far lands by the reset. This reads on the line after the
@@ -130,40 +135,44 @@ export default Plugin.define({
   id: "go-usage",
   setup(context) {
     const [tick, setTick] = createSignal(0)
-    const contextTimer = setInterval(() => setTick((n) => n + 1), CONTEXT_MS)
-
     const [rows, setRows] = createSignal<Row[]>([])
+    // The config is read on the context tick as well as on every refresh: it is a
+    // local file, so keeping it live costs no API call, and it is also the only way
+    // back when both views are off and the panel has nowhere to be opened from.
+    const [cfg, setCfg] = createSignal<Config>(DEFAULTS)
+    // One order for every place the windows are listed, so the sidebar, the footer
+    // and the dialog cannot disagree about which window comes first.
+    const shown = createMemo(() => orderRows(rows(), cfg().order))
 
     // The session id arrives with a render and the dialog that opens by itself needs
     // the same session to show its cost, so the latest one is kept for it.
     let sessionID: string | undefined
-    // A window that starts projecting past its limit gets the dialog once: the labels
+    // A window that starts forecasting past its limit gets the dialog once: the labels
     // already announced are remembered, so it does not reopen on every refresh while the
     // alert continues. The first reading only seeds that set, so a session that starts
     // with a window already over the line shows the (!) instead of an unprompted modal.
     // The config vetoes: the alert is still tracked while it says no, so turning the
     // switch back on does not replay an alert that was already announced.
-    let alerting: Set<string> | null = null
-    const refresh = () =>
-      void readRows().then(async (next) => {
-        setRows(next)
-        const cfg = await loadConfig()
-        const now = new Set(
-          next
-            .filter((row) => row.projected > cfg.autoOpenAt && cfg.autoOpenWindows.includes(row.label))
-            .map((row) => row.label),
-        )
-        const seen = alerting
-        const started = seen === null ? [] : [...now].filter((label) => !seen.has(label))
-        alerting = now
-        if (started.length && cfg.autoOpen) openDetail(sessionID)
-      })
-    refresh()
-    const rowsTimer = setInterval(refresh, REFRESH_MS)
+    let announced: Set<string> | null = null
+    const refresh = async () => {
+      const config = await loadConfig()
+      setCfg(config)
+      const next = await readRows(config)
+      setRows(next)
+      const now = new Set(
+        next
+          .filter((row) => alerting(row, config) && config.autoOpenWindows.includes(row.label))
+          .map((row) => row.label),
+      )
+      const seen = announced
+      const started = seen === null ? [] : [...now].filter((label) => !seen.has(label))
+      announced = now
+      if (started.length && config.autoOpen) openDetail(sessionID)
+    }
 
     const muted = () => context.theme?.text?.muted ?? context.theme?.text?.subdued ?? "#808080"
-    // Theme accent for the cost, so it stands apart from the threshold colours and
-    // from the muted title.
+    // Theme accent for the cost and the section headers, so they stand apart from the
+    // threshold colours and from the muted title.
     const accent = () =>
       context.theme?.hue?.accent?.["500"] ?? context.theme?.hue?.interactive?.["300"] ?? "#FF9654"
 
@@ -186,14 +195,18 @@ export default Plugin.define({
             <Show when={props.label}>
               <text>{col("context")}</text>
             </Show>
-            <text fg={thresholdColor(context.theme, info()?.percent ?? 0)}>{bar(info()?.percent ?? 0)}</text>
-            <Show when={info()?.percent !== undefined}>
-              <text fg={thresholdColor(context.theme, info()?.percent ?? 0)}>
+            <text fg={thresholdColor(context.theme, info()?.percent ?? 0, cfg().thresholds)}>
+              {bar(info()?.percent ?? 0, cfg().bar.cells, cfg().bar.glyphs)}
+            </text>
+            <Show when={cfg().columns.percent && info()?.percent !== undefined}>
+              <text fg={thresholdColor(context.theme, info()?.percent ?? 0, cfg().thresholds)}>
                 {" " + String(info()?.percent).padStart(3) + "%"}
               </text>
             </Show>
-            <text>{" " + tokens(info())}</text>
-            <Show when={spent() > 0}>
+            <Show when={cfg().columns.tokens}>
+              <text>{" " + tokens(info())}</text>
+            </Show>
+            <Show when={cfg().columns.cost && spent() > 0}>
               <text fg={accent()}>{" " + USD.format(spent())}</text>
             </Show>
           </box>
@@ -205,29 +218,40 @@ export default Plugin.define({
     // in the threshold colour, then the reset countdown, then a flag when the pace
     // seen so far projects past the limit before the window resets.
     //
-    // The forecast is a detail, so it is not in the row: clicking a row (or the
-    // title) opens every figure in one dialog and the (!) is the hint that there is
-    // one to read. onMouseUp, not onMouseDown, is what the built-in rows use.
+    // A forecast breach wears that colour on the bar and the percentage too, not only
+    // on the (!): a window still at 14% that is going to saturate has to look like it.
+    // alerting() is the same predicate the (!), the dialog and the automatic opening
+    // use, so the three cannot disagree.
     //
-    // alert colours the label for the dialog: there a saturating window has to stand out
-    // from the rest, while in the sidebar the (!) is enough.
-    const PlanRow = (props: { row: Row; onDetail?: () => void; alert?: boolean }) => (
-      <box flexDirection="row" gap={0} onMouseUp={props.onDetail}>
-        <text fg={props.alert ? thresholdColor(context.theme, props.row.projected) : undefined}>
-          {col(props.row.label)}
-        </text>
-        <text fg={thresholdColor(context.theme, props.row.percent)}>{bar(props.row.percent)}</text>
-        <text fg={thresholdColor(context.theme, props.row.percent)}>
-          {" " + String(props.row.percent).padStart(3) + "%"}
-        </text>
-        <text fg={resetImminent(props.row) ? thresholdColor(context.theme, props.row.percent) : muted()}>
-          {" " + props.row.reset}
-        </text>
-        <Show when={props.row.projected > 100}>
-          <text fg={thresholdColor(context.theme, props.row.projected)}>{" (!)"}</text>
-        </Show>
-      </box>
-    )
+    // The forecast itself is a detail, so it is not in the row: clicking a row (or the
+    // title) opens every figure in one dialog and the (!) is the hint that there is one
+    // to read. onMouseUp, not onMouseDown, is what the built-in rows use.
+    //
+    // alert colours the label for the dialog: there a saturating window has to stand
+    // out from the rest, while in the sidebar the (!) is enough.
+    const PlanRow = (props: { row: Row; onDetail?: () => void; alert?: boolean }) => {
+      const colour = () =>
+        alerting(props.row, cfg())
+          ? thresholdColor(context.theme, 100, cfg().thresholds)
+          : thresholdColor(context.theme, props.row.percent, cfg().thresholds)
+      return (
+        <box flexDirection="row" gap={0} onMouseUp={props.onDetail}>
+          <text fg={props.alert ? colour() : undefined}>{col(props.row.label)}</text>
+          <text fg={colour()}>{bar(props.row.percent, cfg().bar.cells, cfg().bar.glyphs)}</text>
+          <Show when={cfg().columns.percent}>
+            <text fg={colour()}>{" " + String(props.row.percent).padStart(3) + "%"}</text>
+          </Show>
+          <Show when={cfg().columns.reset}>
+            <text fg={resetImminent(props.row, cfg().thresholds) ? colour() : muted()}>
+              {" " + props.row.reset}
+            </text>
+          </Show>
+          <Show when={cfg().columns.flag && alerting(props.row, cfg())}>
+            <text fg={colour()}>{" (!)"}</text>
+          </Show>
+        </box>
+      )
+    }
 
     // Where the detail goes: the forecast of every window and the context figures
     // that do not fit the sidebar row, in one dialog opened from the title or from
@@ -253,15 +277,15 @@ export default Plugin.define({
           paddingLeft={2}
           paddingRight={2}
         >
-          <text fg={accent()}>{"Go plan"}</text>
-          <For each={rows()}>
+          <text fg={cfg().accentLabels ? accent() : muted()}>{"Go plan"}</text>
+          <For each={shown()}>
             {(row, index) => (
               <box flexDirection="column">
-                <PlanRow row={row} alert={row.projected > 100} />
-                <text fg={row.projected > 100 ? thresholdColor(context.theme, row.projected) : muted()}>
+                <PlanRow row={row} alert={alerting(row, cfg())} />
+                <text fg={alerting(row, cfg()) ? thresholdColor(context.theme, 100, cfg().thresholds) : muted()}>
                   {col("") + (row.span ? row.span + " · " : "") + planMessage(row)}
                 </text>
-                <Show when={index() < rows().length - 1}>
+                <Show when={index() < shown().length - 1}>
                   <text>{" "}</text>
                 </Show>
               </box>
@@ -269,7 +293,7 @@ export default Plugin.define({
           </For>
           <text>{" "}</text>
           <Show when={info()}>
-            <text fg={accent()}>{"Context"}</text>
+            <text fg={cfg().accentLabels ? accent() : muted()}>{"Context"}</text>
             <Show when={info()?.model}>
               <text>{col("model") + info()?.model}</text>
             </Show>
@@ -296,44 +320,100 @@ export default Plugin.define({
       context.ui.dialog.set({ size: "large", centered: true })
     }
 
-    // Sidebar: one title, then one row per figure. A failed script call leaves the
-    // context row in place and a single placeholder instead of the plan windows.
-    const sidebar = context.ui.slot({
-      append: "sidebar.content",
-      render: (props: any) => {
-        sessionID = props.sessionID
-        return (
-          <box flexDirection="column">
-            <text fg={muted()} onMouseUp={() => openDetail(props.sessionID)}>
-              {TITLE}
-            </text>
-            <box onMouseUp={() => openDetail(props.sessionID)}>
-              <ContextRow sessionID={props.sessionID} cost label />
-            </box>
-            <For each={rows()}>
-              {(row) => <PlanRow row={row} onDetail={() => openDetail(props.sessionID)} />}
-            </For>
-            <Show when={rows().length === 0}>
-              <text fg={muted()}>{col("plan") + "n/a"}</text>
-            </Show>
-          </box>
-        )
-      },
-    })
+    // A view that is off must not be registered at all: a registered slot that renders
+    // nothing still leaves an empty line where its block would have been.
+    let sidebarSlot: (() => void) | undefined
+    let footerSlot: (() => void) | undefined
+    const syncSlots = (config: Config) => {
+      if (config.sidebar && !sidebarSlot) {
+        // Sidebar: one title, then one row per figure. A failed call to the endpoint
+        // leaves the context row in place and a single placeholder for the plan windows.
+        sidebarSlot = context.ui.slot({
+          append: "sidebar.content",
+          render: (props: any) => {
+            sessionID = props.sessionID
+            return (
+              <box flexDirection="column">
+                <text fg={muted()} onMouseUp={() => openDetail(props.sessionID)}>
+                  {TITLE}
+                </text>
+                <box onMouseUp={() => openDetail(props.sessionID)}>
+                  <ContextRow sessionID={props.sessionID} cost label />
+                </box>
+                <For each={shown()}>
+                  {(row) => <PlanRow row={row} onDetail={() => openDetail(props.sessionID)} />}
+                </For>
+                <Show when={shown().length === 0}>
+                  <text fg={muted()}>{col("plan") + "n/a"}</text>
+                </Show>
+              </box>
+            )
+          },
+        })
+      } else if (!config.sidebar && sidebarSlot) {
+        sidebarSlot()
+        sidebarSlot = undefined
+      }
+      if (config.footer && !footerSlot) {
+        // Prompt footer row: no label column, the plan windows in the compact form,
+        // and a divider between the two areas.
+        footerSlot = context.ui.slot({
+          append: "prompt.footer.status",
+          render: (props: any) => {
+            sessionID = props.sessionID
+            return (
+              <box flexDirection="row" gap={0}>
+                <ContextRow sessionID={props.sessionID} />
+                <Show when={shown().length > 0}>
+                  <text>{" | " + brief(shown())}</text>
+                </Show>
+              </box>
+            )
+          },
+        })
+      } else if (!config.footer && footerSlot) {
+        footerSlot()
+        footerSlot = undefined
+      }
+    }
 
-    // Prompt footer row: no label column, the plan windows in the compact form,
-    // and a divider between the two areas.
-    const footer = context.ui.slot({
-      append: "prompt.footer.status",
-      render: (props: any) => (
-        <box flexDirection="row" gap={0}>
-          <ContextRow sessionID={props.sessionID} />
-          <Show when={rows().length > 0}>
-            <text>{" | " + brief(rows())}</text>
-          </Show>
-        </box>
-      ),
-    })
+    // Nothing visible and nothing to announce means the endpoint is never called. The
+    // context tick stays on either way: it reads local session data, and it is what
+    // notices a config change that turns a view back on.
+    let contextTimer: ReturnType<typeof setInterval> | undefined
+    let rowsTimer: ReturnType<typeof setInterval> | undefined
+    let contextMs = 0
+    let planMs = 0
+    const syncTimers = (config: Config) => {
+      const wantsRows = pollingNeeded(config)
+      if (config.refresh.contextMs !== contextMs) {
+        contextMs = config.refresh.contextMs
+        if (contextTimer) clearInterval(contextTimer)
+        contextTimer = setInterval(() => {
+          setTick((n) => n + 1)
+          void applyConfig()
+        }, contextMs)
+      }
+      if (config.refresh.planMs !== planMs) {
+        planMs = config.refresh.planMs
+        if (rowsTimer) clearInterval(rowsTimer)
+        rowsTimer = wantsRows ? setInterval(() => void refresh(), planMs) : undefined
+      } else if (wantsRows && !rowsTimer) {
+        // Turning a view back on should not wait out a whole refresh interval.
+        rowsTimer = setInterval(() => void refresh(), planMs)
+        void refresh()
+      } else if (!wantsRows && rowsTimer) {
+        clearInterval(rowsTimer)
+        rowsTimer = undefined
+      }
+    }
+
+    const applyConfig = async () => {
+      const config = await loadConfig()
+      setCfg(config)
+      syncSlots(config)
+      syncTimers(config)
+    }
 
     // Shortcut hints that belonged to the disabled built-in footer. Plain text:
     // the key caps styling of the built-in is not reproduced.
@@ -347,11 +427,13 @@ export default Plugin.define({
           })
         : undefined
 
+    void applyConfig().then(() => void refresh())
+
     return () => {
-      clearInterval(contextTimer)
-      clearInterval(rowsTimer)
-      sidebar()
-      footer()
+      if (contextTimer) clearInterval(contextTimer)
+      if (rowsTimer) clearInterval(rowsTimer)
+      sidebarSlot?.()
+      footerSlot?.()
       footerShortcuts?.()
     }
   },
