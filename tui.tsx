@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, createSignal, For, Show } from "solid-js"
-import { homedir } from "node:os"
 import { Plugin } from "@opencode/plugin/tui"
+import { loadConfig } from "./src/config"
 import { buildRows, type Row } from "./src/rows"
 import { fetchUsage, readAuthKey } from "./src/usage"
 
@@ -11,10 +11,6 @@ import { fetchUsage, readAuthKey } from "./src/usage"
 // ("-opencode.sidebar.context", "-opencode.prompt.footer") and the separate
 // go-usage plugin it used to be split across: a single file means a single label
 // column, so every bar starts on the same one.
-// The switch for the dialog that opens by itself on the first alert. Re-read on
-// every refresh, so flipping it does not need a restart; a missing or unreadable
-// file means on, which is the behaviour before the switch existed.
-const CONFIG = `${homedir()}/.config/opencode/plugins/context-bar/config.json`
 // The plan windows come from a remote API and move on a long cycle; the context
 // usage changes with every message, so it gets its own shorter tick.
 const REFRESH_MS = 60_000
@@ -35,21 +31,6 @@ async function readRows(): Promise<Row[]> {
   const key = await readAuthKey()
   const usage = key ? await fetchUsage(key) : null
   return usage ? buildRows(usage) : []
-}
-
-// The switch for the dialog that opens by itself: `{"autoOpen": false}` in a
-// config.json beside the plugin turns it off. Anything else, including no file at
-// all, leaves it on, which is the behaviour before the switch existed.
-function wantsAutoOpen(cfg: any): boolean {
-  return cfg?.autoOpen !== false
-}
-
-async function autoOpen(): Promise<boolean> {
-  try {
-    return wantsAutoOpen(await Bun.file(CONFIG).json())
-  } catch {
-    return true
-  }
 }
 
 function thresholdColor(theme: any, percent: number): string {
@@ -160,17 +141,22 @@ export default Plugin.define({
     // already announced are remembered, so it does not reopen on every refresh while the
     // alert continues. The first reading only seeds that set, so a session that starts
     // with a window already over the line shows the (!) instead of an unprompted modal.
-    // autoOpen() is the veto: the alert is still tracked while it says no, so turning the
+    // The config vetoes: the alert is still tracked while it says no, so turning the
     // switch back on does not replay an alert that was already announced.
     let alerting: Set<string> | null = null
     const refresh = () =>
       void readRows().then(async (next) => {
         setRows(next)
-        const now = new Set(next.filter((row) => row.projected > 100).map((row) => row.label))
+        const cfg = await loadConfig()
+        const now = new Set(
+          next
+            .filter((row) => row.projected > cfg.autoOpenAt && cfg.autoOpenWindows.includes(row.label))
+            .map((row) => row.label),
+        )
         const seen = alerting
         const started = seen === null ? [] : [...now].filter((label) => !seen.has(label))
         alerting = now
-        if (started.length && (await autoOpen())) openDetail(sessionID)
+        if (started.length && cfg.autoOpen) openDetail(sessionID)
       })
     refresh()
     const rowsTimer = setInterval(refresh, REFRESH_MS)
