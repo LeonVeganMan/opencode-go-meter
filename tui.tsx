@@ -2,6 +2,8 @@
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { homedir } from "node:os"
 import { Plugin } from "@opencode/plugin/tui"
+import { buildRows, type Row } from "./src/rows"
+import { fetchUsage, readAuthKey } from "./src/usage"
 
 // Local TUI plugin: one "Context & Go" block, the session's context usage as the
 // first row and the OpenCode Go plan windows under it, plus the same two figures
@@ -9,7 +11,6 @@ import { Plugin } from "@opencode/plugin/tui"
 // ("-opencode.sidebar.context", "-opencode.prompt.footer") and the separate
 // go-usage plugin it used to be split across: a single file means a single label
 // column, so every bar starts on the same one.
-const SCRIPT = `${homedir()}/.config/opencode/scripts/go-usage.sh`
 // The switch for the dialog that opens by itself on the first alert. Re-read on
 // every refresh, so flipping it does not need a restart; a missing or unreadable
 // file means on, which is the behaviour before the switch existed.
@@ -27,35 +28,13 @@ const TITLE = "Context & Go"
 const SHORT: Record<string, string> = { "5h": "5h", weekly: "w", monthly: "m" }
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 
-type Row = { label: string; percent: number; reset: string; remaining: number; projected: number; span: string }
-
-// The Go plan windows come from the tested shell script, the single source of
-// truth for the API call and for the countdown, instead of a second HTTP client
-// here. Seven tab-separated fields, so nothing is parsed back out of the
-// human-readable countdown: the last two are where the window lands at its reset
-// if usage keeps the current pace (empty when the window is too young to tell) and
-// how much of the window has already elapsed.
+// The plan windows come from the usage endpoint this plugin reads itself, so the
+// figures and the countdown are the same ones src/windows.ts computes, without a
+// second implementation to keep in step.
 async function readRows(): Promise<Row[]> {
-  try {
-    const proc = Bun.spawn(["bash", SCRIPT, "--tui"], { stdout: "pipe", stderr: "ignore" })
-    const out = (await new Response(proc.stdout).text()).trim()
-    return out
-      .split("\n")
-      .map((line) => {
-        const [label, percent, reset, , secs, proj, span] = line.split("\t")
-        return {
-          label,
-          percent: Number(percent),
-          reset,
-          remaining: Number(secs),
-          projected: Number(proj),
-          span: span ?? "",
-        }
-      })
-      .filter((row) => row.label && !Number.isNaN(row.percent))
-  } catch {
-    return []
-  }
+  const key = await readAuthKey()
+  const usage = key ? await fetchUsage(key) : null
+  return usage ? buildRows(usage) : []
 }
 
 // The switch for the dialog that opens by itself: `{"autoOpen": false}` in a
