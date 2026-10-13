@@ -4,12 +4,14 @@
 from `~/.local/share/opencode/auth.json` (the `opencode-go` entry) and calls
 `https://opencode.ai/zen/go/v1/usage`. With no opencode-go subscription there is nothing to show.
 
-A TUI plugin for opencode: your context usage and your opencode-go plan windows in the sidebar and
-on the prompt footer row, with a forecast of where the current pace lands by each reset.
+A TUI plugin for **opencode v2**: your context usage and your opencode-go plan windows in the sidebar
+and on the prompt footer row, with a forecast of where the current pace lands by each reset.
 
 ## Requirements
 
-- opencode with TUI plugin support (the plugin uses `@opencode/plugin/tui`), which ships its own Bun.
+- **opencode v2** — the generation whose plugins are loaded from `~/.config/opencode/plugins/` and
+  built on `@opencode/plugin/tui` (`ui.slot`, `ui.dialog`). It ships its own Bun, so nothing else is
+  needed. The v1 plugin API is a different generation and this plugin does not target it.
 - An opencode-go subscription, and its key in `~/.local/share/opencode/auth.json` — the same file
   opencode writes when you log in.
 
