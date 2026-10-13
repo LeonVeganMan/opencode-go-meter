@@ -1,7 +1,12 @@
 {
-  "name": "opencode-context-bar",
+  "name": "opencode-go-usage",
+  "version": "1.0.0",
+  "private": false,
   "type": "module",
   "exports": {
     "./tui": "./tui.tsx"
+  },
+  "scripts": {
+    "test": "bun test"
   }
 }
