@@ -12,7 +12,13 @@ const WINDOW_KEYS: Win[] = ["rolling", "weekly", "monthly"]
 
 function isUsageWindow(value: unknown): value is UsageWindow {
   const window = value as UsageWindow | null | undefined
-  return !!window && typeof window.percent === "number" && typeof window.resetsAt === "string"
+  // A string that is not a date would render as "NaNm": drop the window instead.
+  return (
+    !!window &&
+    typeof window.percent === "number" &&
+    typeof window.resetsAt === "string" &&
+    !Number.isNaN(Date.parse(window.resetsAt))
+  )
 }
 
 // Total for `unknown`: anything that is not the payload we know becomes null, so a

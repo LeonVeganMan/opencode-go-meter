@@ -19,3 +19,10 @@ test("keeps the window it can read and drops the rest", () => {
   expect(parseUsage(partial)?.weekly).toBeUndefined()
   expect(parseUsage(partial)?.monthly.percent).toBe(14)
 })
+
+test("a timestamp that is not a date is not a figure", () => {
+  const bad = { usage: { ...ok.usage, weekly: { status: "ok", percent: 17, resetsAt: "n/a" } } }
+  expect(parseUsage(bad)?.weekly).toBeUndefined()
+  expect(parseUsage(bad)?.monthly.percent).toBe(14)
+  expect(parseUsage({ usage: { rolling: { status: "ok", percent: 20, resetsAt: "" } } })).toBe(null)
+})
