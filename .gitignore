@@ -1,0 +1,4 @@
+.superpowers/
+config.json
+node_modules
+*.log

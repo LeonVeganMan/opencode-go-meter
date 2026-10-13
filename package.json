@@ -1,0 +1,7 @@
+{
+  "name": "opencode-context-bar",
+  "type": "module",
+  "exports": {
+    "./tui": "./tui.tsx"
+  }
+}
