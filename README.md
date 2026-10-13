@@ -1,5 +1,10 @@
 # opencode-go-meter
 
+[![opencode v2](https://img.shields.io/badge/opencode-v2-orange.svg)](#requirements)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![release](https://img.shields.io/github/v/tag/LeonVeganMan/opencode-go-meter?label=release)](https://github.com/LeonVeganMan/opencode-go-meter/releases)
+[![tests](https://img.shields.io/badge/tests-bun%20test-informational.svg)](#development)
+
 **This plugin only works for [opencode-go](https://opencode.ai) subscribers.** It reads your key
 from `~/.local/share/opencode/auth.json` (the `opencode-go` entry) and calls
 `https://opencode.ai/zen/go/v1/usage`. With no opencode-go subscription there is nothing to show.
