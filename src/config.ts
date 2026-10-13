@@ -239,3 +239,30 @@ export async function saveConfig(cfg: Config, path: string = configPath()): Prom
 export function pollingNeeded(cfg: Config): boolean {
   return cfg.sidebar || cfg.footer || cfg.autoOpen
 }
+
+// The widest key optionKeys() produces is autoOpenWindows.monthly, 23 characters:
+// padding to that keeps one column of values for every row, including that one.
+const LABEL_COLUMN = 23
+
+// What the panel shows for a key, and what a click on it will therefore change. A
+// boolean reads as on/off, everything else as its own value.
+export function optionLabel(cfg: Config, key: string): string {
+  return key.padEnd(LABEL_COLUMN) + optionValue(cfg, key)
+}
+
+function optionValue(cfg: Config, key: string): string {
+  if (key.startsWith("autoOpenWindows.")) {
+    return cfg.autoOpenWindows.includes(key.slice("autoOpenWindows.".length)) ? "on" : "off"
+  }
+  if (key.startsWith("columns.")) {
+    return cfg.columns[key.slice("columns.".length) as keyof Config["columns"]] ? "on" : "off"
+  }
+  if (key === "bar.glyphs") return cfg.bar.glyphs
+  if (key === "order") return cfg.order
+  const [group, leaf] = key.split(".")
+  if (group === "bar" || group === "thresholds" || group === "refresh") {
+    return String((cfg[group] as Record<string, unknown>)[leaf])
+  }
+  const value = (cfg as unknown as Record<string, unknown>)[key]
+  return typeof value === "boolean" ? (value ? "on" : "off") : String(value)
+}

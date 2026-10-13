@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test"
-import { DEFAULTS, mergeConfig, cycleOption, pollingNeeded } from "../src/config"
+import { DEFAULTS, mergeConfig, cycleOption, optionLabel, pollingNeeded } from "../src/config"
 
 test("missing keys fall back to the defaults", () => {
   expect(mergeConfig({})).toEqual(DEFAULTS)
@@ -36,4 +36,10 @@ test("nothing visible and no alert means no API calls", () => {
   expect(pollingNeeded(mergeConfig({ sidebar: false, footer: false, autoOpen: false }))).toBe(false)
   expect(pollingNeeded(mergeConfig({ sidebar: false, footer: false }))).toBe(true)
   expect(pollingNeeded(DEFAULTS)).toBe(true)
+})
+test("a row states its value so a click is predictable", () => {
+  expect(optionLabel(DEFAULTS, "sidebar")).toBe("sidebar                on")
+  expect(optionLabel(DEFAULTS, "thresholds.warning")).toBe("thresholds.warning     75")
+  expect(optionLabel(DEFAULTS, "bar.cells")).toBe("bar.cells              8")
+  expect(optionLabel(DEFAULTS, "columns.cost")).toBe("columns.cost           on")
 })

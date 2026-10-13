@@ -1,9 +1,10 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { Plugin } from "@opencode/plugin/tui"
-import { DEFAULTS, loadConfig, pollingNeeded, type Config, type Glyph } from "./src/config"
+import { DEFAULTS, loadConfig, pollingNeeded, saveConfig, type Config, type Glyph } from "./src/config"
 import { alerting, buildRows, orderRows, type Row } from "./src/rows"
 import { fetchUsage, readAuthKey } from "./src/usage"
+import { Settings } from "./settings"
 
 // Local TUI plugin: one "Context & Go" block, the session's context usage as the
 // first row and the OpenCode Go plan windows under it, plus the same two figures
@@ -308,6 +309,9 @@ export default Plugin.define({
             </Show>
           </Show>
           <text>{" "}</text>
+          <text fg={cfg().accentLabels ? accent() : muted()} onMouseUp={openSettings}>
+            {"Settings"}
+          </text>
           <text fg={muted()} onMouseUp={() => context.ui.dialog.clear()}>
             {"esc, or a click here, closes"}
           </text>
@@ -317,6 +321,23 @@ export default Plugin.define({
 
     const openDetail = (sessionID?: string) => {
       context.ui.dialog.show(() => <Detail sessionID={sessionID} />)
+      context.ui.dialog.set({ size: "large", centered: true })
+    }
+
+    // The panel writes the same config.json a hand edit does, and the signal takes the
+    // new value straight away so the render behind the dialog moves with the click
+    // instead of waiting for the next refresh to read the file back.
+    const openSettings = () => {
+      context.ui.dialog.show(() => (
+        <Settings
+          config={cfg}
+          onChange={(next) => {
+            setCfg(next)
+            void saveConfig(next)
+          }}
+          onClose={() => context.ui.dialog.clear()}
+        />
+      ))
       context.ui.dialog.set({ size: "large", centered: true })
     }
 
