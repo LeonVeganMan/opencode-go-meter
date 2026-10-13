@@ -167,7 +167,7 @@ function read(context: any, sessionID?: string) {
 }
 
 export default Plugin.define({
-  id: "context-bar",
+  id: "go-usage",
   setup(context) {
     const [tick, setTick] = createSignal(0)
     const contextTimer = setInterval(() => setTick((n) => n + 1), CONTEXT_MS)
