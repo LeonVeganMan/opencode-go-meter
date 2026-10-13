@@ -4,6 +4,12 @@
   "description": "Your session context usage and OpenCode Go plan windows in the opencode v2 TUI sidebar, with a forecast of where the current pace lands by each reset.",
   "private": false,
   "type": "module",
+  "files": [
+    "tui.tsx",
+    "settings.tsx",
+    "src",
+    "assets"
+  ],
   "exports": {
     "./tui": "./tui.tsx"
   },

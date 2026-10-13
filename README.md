@@ -112,6 +112,11 @@ The info dialog, opened by clicking the title or any row, with the `Settings` ro
 
 ![Info dialog](assets/dialog.png)
 
+The options panel, opened from that `Settings` row. Every click moves a row to its next value and
+writes `config.json` straight away:
+
+![Settings panel](assets/settings.png)
+
 ## Options
 
 Click any row in **Settings** to move it to its next value: the panel writes `config.json` beside
