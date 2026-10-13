@@ -83,11 +83,11 @@ function planMessage(row: Row): string {
   )
 }
 
-// Footer form of the plan windows, the same string the script prints with --brief.
+// Footer form of the plan windows, the percentages alone: the alert is not baked
+// into this string because it travels as a separately coloured run, the same (!)
+// the sidebar rows carry.
 function brief(rows: Row[]): string {
-  const worst = Math.max(...rows.map((row) => row.percent))
-  const flag = worst >= 90 ? " !!" : worst >= 75 ? " !" : ""
-  return rows.map((row) => `${SHORT[row.label] ?? row.label}:${row.percent}%`).join(" ") + flag
+  return rows.map((row) => `${SHORT[row.label] ?? row.label}:${row.percent}%`).join(" ")
 }
 
 // Label column: "context ", "5h      ", "monthly ".
@@ -133,7 +133,7 @@ function read(context: any, sessionID?: string) {
 }
 
 export default Plugin.define({
-  id: "go-usage",
+  id: "go-meter",
   setup(context) {
     const [tick, setTick] = createSignal(0)
     const [rows, setRows] = createSignal<Row[]>([])
@@ -377,7 +377,8 @@ export default Plugin.define({
       }
       if (config.footer && !footerSlot) {
         // Prompt footer row: no label column, the plan windows in the compact form,
-        // and a divider between the two areas.
+        // a divider between the two areas, and the same forecast alert the rows carry
+        // as a separately coloured (!) — coherence with the sidebar is the point.
         footerSlot = context.ui.slot({
           append: "prompt.footer.status",
           render: (props: any) => {
@@ -387,6 +388,9 @@ export default Plugin.define({
                 <ContextRow sessionID={props.sessionID} />
                 <Show when={shown().length > 0}>
                   <text>{" | " + brief(shown())}</text>
+                </Show>
+                <Show when={shown().some((row) => alerting(row, cfg()))}>
+                  <text fg={thresholdColor(context.theme, 100, cfg().thresholds)}>{" (!)"}</text>
                 </Show>
               </box>
             )

@@ -1,4 +1,4 @@
-# opencode-go-usage
+# opencode-go-meter
 
 **This plugin only works for [opencode-go](https://opencode.ai) subscribers.** It reads your key
 from `~/.local/share/opencode/auth.json` (the `opencode-go` entry) and calls
@@ -7,10 +7,16 @@ from `~/.local/share/opencode/auth.json` (the `opencode-go` entry) and calls
 A TUI plugin for opencode: your context usage and your opencode-go plan windows in the sidebar and
 on the prompt footer row, with a forecast of where the current pace lands by each reset.
 
+## Requirements
+
+- opencode with TUI plugin support (the plugin uses `@opencode/plugin/tui`), which ships its own Bun.
+- An opencode-go subscription, and its key in `~/.local/share/opencode/auth.json` — the same file
+  opencode writes when you log in.
+
 ## Install
 
 ```bash
-git clone <this repo> ~/.config/opencode/plugins/opencode-go-usage
+git clone https://github.com/LeonVeganMan/opencode-go-meter ~/.config/opencode/plugins/opencode-go-meter
 ```
 
 Local plugins are discovered from `~/.config/opencode/plugins/<name>/` — no entry in
@@ -49,6 +55,26 @@ and where the pace lands by the reset, the model, the used tokens against the co
 cost, and a **Settings** row. The dialog also opens by itself the first time a window starts
 forecasting past the threshold — once per alert, not on every refresh.
 
+### Where the numbers come from
+
+The endpoint sends only a percentage and the timestamp of the next reset, no window length. The
+window's start is derived from that timestamp: the reset minus 5 hours for the 5h window, minus 7
+days for the weekly one, minus one calendar month for the monthly one. All three land in the past,
+which is what makes the derivation checkable. How far into a window you are, combined with the
+percentage used, is the pace: `percent × window / elapsed`. Below 5% of a window elapsed no forecast
+is attempted, because a burst right after a reset would project to thousands.
+
+### Opening the panel
+
+1. Restart opencode after installing — the plugin source is read at startup.
+2. Click `Context & Go` in the sidebar, or any row under it.
+3. In the dialog that opens, click the `Settings` row at the bottom.
+4. Click a row to move it to its next value; `config.json` is written immediately.
+
+The panel is only reachable through that dialog, so turning both `sidebar` and `footer` off leaves
+you with no way in: from then on edit `config.json` by hand (one key is enough — everything else
+keeps its default).
+
 ## Options
 
 Click any row in **Settings** to move it to its next value: the panel writes `config.json` beside
@@ -79,6 +105,22 @@ re-read on a timer, so neither a click nor an edit needs a restart.
 
 One option is not in the file: with `sidebar`, `footer` and `autoOpen` all `false` nothing can show or
 announce the figures, and the endpoint is never called.
+
+## Troubleshooting
+
+- **`plan   n/a` in the sidebar.** The call to the usage endpoint failed (no opencode-go
+  subscription, no `opencode-go` key in `auth.json`, or the network). The context row keeps working:
+  it reads local session data. The plan rows come back on the next successful refresh.
+- **Nothing appears at all.** Restart opencode (the plugin is read at startup); check the folder is
+  `~/.config/opencode/plugins/opencode-go-meter/`; check `sidebar` and `footer` are not both `false`
+  in `config.json`.
+- **The same figures appear twice.** The built-ins `opencode.sidebar.context` and
+  `opencode.prompt.footer` are still enabled — disable them in `cli.json` as shown above.
+- **The bar is wider than one column, or a row wraps.** A font that draws `█`/`░` double width: set
+  `bar.glyphs` to `"ascii"`.
+- **No `(!)` on a window that is clearly going to blow.** A forecast needs at least
+  `projectionMinElapsed` percent of the window behind it (5 by default), otherwise a burst right after
+  a reset would project to thousands.
 
 ## Development
 

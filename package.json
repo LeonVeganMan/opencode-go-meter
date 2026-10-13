@@ -1,6 +1,7 @@
 {
-  "name": "opencode-go-usage",
+  "name": "opencode-go-meter",
   "version": "1.0.0",
+  "description": "Your session context usage and OpenCode Go plan windows in the opencode TUI sidebar, with a forecast of where the current pace lands by each reset.",
   "private": false,
   "type": "module",
   "exports": {
@@ -8,5 +9,19 @@
   },
   "scripts": {
     "test": "bun test"
-  }
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "tui",
+    "quota",
+    "usage"
+  ],
+  "license": "MIT",
+  "author": "Leonardo Cosmai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LeonVeganMan/opencode-go-meter.git"
+  },
+  "homepage": "https://github.com/LeonVeganMan/opencode-go-meter#readme"
 }
