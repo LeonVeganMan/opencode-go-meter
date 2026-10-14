@@ -3,6 +3,7 @@
 [![opencode v2](https://img.shields.io/badge/opencode-v2-orange.svg)](#requirements)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![release](https://img.shields.io/github/v/tag/LeonVeganMan/opencode-go-meter?label=release)](https://github.com/LeonVeganMan/opencode-go-meter/releases)
+[![npm](https://img.shields.io/npm/v/opencode-go-meter)](https://www.npmjs.com/package/opencode-go-meter)
 [![tests](https://img.shields.io/badge/tests-bun%20test-informational.svg)](#development)
 
 **This plugin only works for [opencode-go](https://opencode.ai) subscribers.** It reads your key
@@ -28,6 +29,10 @@ git clone https://github.com/LeonVeganMan/opencode-go-meter ~/.config/opencode/p
 
 Local plugins are discovered from `~/.config/opencode/plugins/<name>/` — no entry in
 `opencode.json` is needed. Restart opencode: the plugin itself is read at startup.
+
+Also published on npm as [`opencode-go-meter`](https://www.npmjs.com/package/opencode-go-meter).
+The clone above stays the documented install — opencode loads plugins from that folder — and the
+npm package is there for the directories and registries that index plugins.
 
 The built-in blocks this plugin replaces are the reason it exists. If you keep them, disable them in
 `cli.json` so the figures are not shown twice:
