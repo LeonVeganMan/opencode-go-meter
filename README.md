@@ -37,6 +37,11 @@ For hacking on it, install from a clone instead — plugins are also discovered 
 git clone https://github.com/LeonVeganMan/opencode-go-meter ~/.config/opencode/plugins/opencode-go-meter
 ```
 
+The clone is for development only. `opencode plugin add` installs the npm package
+*alongside* it, and OpenCode would then load the same plugin twice: duplicated palette
+entries and a doubled sidebar block. Pick one — move the clone out of
+`~/.config/opencode/plugins/` before installing from npm.
+
 The built-in blocks this plugin replaces are the reason it exists. If you keep them, disable them in
 `cli.json` so the figures are not shown twice:
 
