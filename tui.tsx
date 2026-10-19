@@ -134,7 +134,7 @@ function read(context: any, sessionID?: string) {
 }
 
 export default Plugin.define({
-  id: "go-meter",
+  id: "opencode-go-meter",
   setup(context) {
     const [tick, setTick] = createSignal(0)
     const [rows, setRows] = createSignal<Row[]>([])
