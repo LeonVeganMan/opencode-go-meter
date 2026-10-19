@@ -54,7 +54,11 @@ export async function readAuthKey(path: string = authPath()): Promise<string | n
   }
 }
 
-export async function fetchUsage(key: string, url: string = USAGE_URL): Promise<Usage | null> {
+export type UsageResult = { usage: Usage | null; error: string | null }
+
+// Same call as fetchUsage, plus why it failed: "plan n/a" in the sidebar is
+// unactionable, the reason is not.
+export async function fetchUsageResult(key: string, url: string = USAGE_URL): Promise<UsageResult> {
   try {
     const response = await fetch(url, {
       headers: {
@@ -64,9 +68,14 @@ export async function fetchUsage(key: string, url: string = USAGE_URL): Promise<
       },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
-    if (!response.ok) return null
-    return parseUsage(await response.json())
-  } catch {
-    return null
+    if (!response.ok) return { usage: null, error: `usage http ${response.status}` }
+    const usage = parseUsage(await response.json())
+    return usage ? { usage, error: null } : { usage: null, error: "usage payload not recognised" }
+  } catch (error) {
+    return { usage: null, error: (error as Error)?.name === "TimeoutError" ? "usage timeout" : "usage request failed" }
   }
+}
+
+export async function fetchUsage(key: string, url: string = USAGE_URL): Promise<Usage | null> {
+  return (await fetchUsageResult(key, url)).usage
 }

@@ -1,3 +1,5 @@
+import { homedir } from "node:os"
+
 // The plugin's options. Every value is one a person can reach from the panel, so
 // this module also owns the single interaction the panel has: cycle a value.
 // A missing key means the default, which is why the file may be absent, empty or
@@ -211,18 +213,32 @@ export function optionKeys(cfg: Config): string[] {
   ]
 }
 
-// Beside the plugin entry, wherever the repo is cloned. src/config.ts is one
-// directory below it.
+// Under the OpenCode config dir, not beside the module: an npm install lives in a
+// versioned cache folder that a plugin update replaces, and settings written there
+// disappear on every release.
 export function configPath(): string {
+  const base = process.env.XDG_CONFIG_HOME || `${homedir()}/.config`
+  return `${base}/opencode/opencode-go-meter.json`
+}
+
+// Before the move, the file sat next to the plugin entry. Still read so the first
+// run after upgrading keeps the settings that were already saved there.
+export function legacyConfigPath(): string {
   return new URL("../config.json", import.meta.url).pathname
 }
 
-export async function loadConfig(path: string = configPath()): Promise<Config> {
-  try {
-    return mergeConfig(await Bun.file(path).json())
-  } catch {
-    return mergeConfig(null)
+export async function loadConfig(
+  path: string = configPath(),
+  fallback: string = legacyConfigPath(),
+): Promise<Config> {
+  for (const candidate of [path, fallback]) {
+    try {
+      return mergeConfig(await Bun.file(candidate).json())
+    } catch {
+      // Missing or unreadable: try the next location.
+    }
   }
+  return mergeConfig(null)
 }
 
 export async function saveConfig(cfg: Config, path: string = configPath()): Promise<void> {

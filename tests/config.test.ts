@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test"
-import { DEFAULTS, mergeConfig, cycleOption, optionLabel, pollingNeeded } from "../src/config"
+import { DEFAULTS, loadConfig, mergeConfig, cycleOption, optionLabel, pollingNeeded } from "../src/config"
+import { tmpdir } from "node:os"
 
 test("missing keys fall back to the defaults", () => {
   expect(mergeConfig({})).toEqual(DEFAULTS)
@@ -42,4 +43,11 @@ test("a row states its value so a click is predictable", () => {
   expect(optionLabel(DEFAULTS, "thresholds.warning")).toBe("thresholds.warning     75")
   expect(optionLabel(DEFAULTS, "bar.cells")).toBe("bar.cells              8")
   expect(optionLabel(DEFAULTS, "columns.cost")).toBe("columns.cost           on")
+})
+
+test("settings saved in the old location are still read", async () => {
+  const dir = `${tmpdir()}/go-meter-${Date.now()}`
+  await Bun.write(`${dir}/old.json`, JSON.stringify({ footer: false }))
+  expect((await loadConfig(`${dir}/missing.json`, `${dir}/old.json`)).footer).toBe(false)
+  expect((await loadConfig(`${dir}/missing.json`, `${dir}/also-missing.json`)).footer).toBe(DEFAULTS.footer)
 })

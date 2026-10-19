@@ -3,7 +3,7 @@ import { createMemo, createSignal, For, Show } from "solid-js"
 import { Plugin } from "@opencode/plugin/tui"
 import { DEFAULTS, loadConfig, pollingNeeded, saveConfig, type Config, type Glyph } from "./src/config"
 import { alerting, buildRows, orderRows, type Row } from "./src/rows"
-import { fetchUsage, readAuthKey } from "./src/usage"
+import { fetchUsageResult, readAuthKey } from "./src/usage"
 import { Settings } from "./settings"
 
 // Local TUI plugin: one "Context & Go" block, the session's context usage as the
@@ -32,10 +32,11 @@ type Thresholds = Config["thresholds"]
 // The plan windows come from the usage endpoint this plugin reads itself, so the
 // figures and the countdown are the same ones src/windows.ts computes, without a
 // second implementation to keep in step.
-async function readRows(config: Config): Promise<Row[]> {
+async function readRows(config: Config): Promise<{ rows: Row[]; error: string | null }> {
   const key = await readAuthKey()
-  const usage = key ? await fetchUsage(key) : null
-  return usage ? buildRows(usage, config) : []
+  if (!key) return { rows: [], error: "no opencode-go key in auth.json" }
+  const { usage, error } = await fetchUsageResult(key)
+  return usage ? { rows: buildRows(usage, config), error: null } : { rows: [], error: error ?? "no usage data" }
 }
 
 function thresholdColor(theme: any, percent: number, thresholds: Thresholds): string {
@@ -137,6 +138,8 @@ export default Plugin.define({
   setup(context) {
     const [tick, setTick] = createSignal(0)
     const [rows, setRows] = createSignal<Row[]>([])
+    // Why the plan figures are missing, shown in place of "n/a".
+    const [planError, setPlanError] = createSignal<string | null>(null)
     // The config is read on the context tick as well as on every refresh: it is a
     // local file, so keeping it live costs no API call, and it is also the only way
     // back when both views are off and the panel has nowhere to be opened from.
@@ -158,8 +161,9 @@ export default Plugin.define({
     const refresh = async () => {
       const config = await loadConfig()
       setCfg(config)
-      const next = await readRows(config)
+      const { rows: next, error } = await readRows(config)
       setRows(next)
+      setPlanError(error)
       const now = new Set(
         next
           .filter((row) => alerting(row, config) && config.autoOpenWindows.includes(row.label))
@@ -334,6 +338,11 @@ export default Plugin.define({
           onChange={(next) => {
             setCfg(next)
             void saveConfig(next)
+            void applyConfig()
+            // The dialog body is drawn once, so the panel is reopened to show the
+            // value the click just wrote.
+            context.ui.dialog.clear()
+            openSettings()
           }}
           onClose={() => context.ui.dialog.clear()}
         />
@@ -366,7 +375,7 @@ export default Plugin.define({
                   {(row) => <PlanRow row={row} onDetail={() => openDetail(props.sessionID)} />}
                 </For>
                 <Show when={shown().length === 0}>
-                  <text fg={muted()}>{col("plan") + "n/a"}</text>
+                  <text fg={muted()}>{col("plan") + (planError() ?? "n/a")}</text>
                 </Show>
               </box>
             )
