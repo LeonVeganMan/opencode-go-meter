@@ -1,6 +1,6 @@
 {
   "name": "opencode-go-meter",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Your session context usage and OpenCode Go plan windows in the opencode v2 TUI sidebar, with a forecast of where the current pace lands by each reset.",
   "private": false,
   "type": "module",
