@@ -1,21 +1,21 @@
 {
   "name": "opencode-go-meter",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Your session context usage and OpenCode Go plan windows in the opencode v2 TUI sidebar, with a forecast of where the current pace lands by each reset.",
   "private": false,
   "type": "module",
-  "files": [
-    "tui.tsx",
-    "settings.tsx",
-    "src",
-    "assets"
-  ],
   "exports": {
     "./tui": "./tui.tsx"
   },
   "scripts": {
     "test": "bun test"
   },
+  "files": [
+    "tui.tsx",
+    "settings.tsx",
+    "src",
+    "assets"
+  ],
   "keywords": [
     "opencode",
     "opencode-plugin",
@@ -29,5 +29,13 @@
     "type": "git",
     "url": "git+https://github.com/LeonVeganMan/opencode-go-meter.git"
   },
-  "homepage": "https://github.com/LeonVeganMan/opencode-go-meter#readme"
+  "homepage": "https://github.com/LeonVeganMan/opencode-go-meter#readme",
+  "peerDependencies": {
+    "@opentui/core": ">=0.5.8",
+    "@opentui/solid": ">=0.5.8",
+    "solid-js": ">=1.9.0"
+  },
+  "devDependencies": {
+    "@opencode/plugin": "latest"
+  }
 }
