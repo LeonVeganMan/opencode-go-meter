@@ -369,7 +369,7 @@ export default Plugin.define({
                   <text fg={muted()} onMouseUp={() => openDetail(props.sessionID)}>
                     {TITLE}
                   </text>
-                  <text fg={muted()} onMouseUp={() => openSettings()}>
+                  <text fg={accent()} onMouseUp={() => openSettings()}>
                     {"settings"}
                   </text>
                 </box>
