@@ -365,9 +365,14 @@ export default Plugin.define({
             sessionID = props.sessionID
             return (
               <box flexDirection="column">
-                <text fg={muted()} onMouseUp={() => openDetail(props.sessionID)}>
-                  {TITLE}
-                </text>
+                <box flexDirection="row" gap={1}>
+                  <text fg={muted()} onMouseUp={() => openDetail(props.sessionID)}>
+                    {TITLE}
+                  </text>
+                  <text fg={muted()} onMouseUp={() => openSettings()}>
+                    {"settings"}
+                  </text>
+                </box>
                 <box onMouseUp={() => openDetail(props.sessionID)}>
                   <ContextRow sessionID={props.sessionID} cost label />
                 </box>
