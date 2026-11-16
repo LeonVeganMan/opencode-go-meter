@@ -4,7 +4,7 @@ import { Plugin } from "@opencode/plugin/tui"
 import { DEFAULTS, loadConfig, pollingNeeded, saveConfig, type Config, type Glyph } from "./src/config"
 import { alerting, buildRows, orderRows, type Row } from "./src/rows"
 import { fetchUsageResult, readAuthKey } from "./src/usage"
-import { cacheHit, cachePercent, cacheTrend } from "./src/cache"
+import { cacheHit, cachePercent, cacheTrend, totalFits } from "./src/cache"
 import { Settings } from "./settings"
 
 // Local TUI plugin: one "Context & Go" block, the session's context usage as the
@@ -194,6 +194,8 @@ export default Plugin.define({
     // threshold colours and from the muted title.
     const accent = () =>
       context.theme?.hue?.accent?.["500"] ?? context.theme?.hue?.interactive?.["300"] ?? "#FF9654"
+    const trendColor = (trend: number) =>
+      trend > 0 ? hitColor(context.theme, 100) : trend < 0 ? hitColor(context.theme, 0) : muted()
 
     // One <text> per run: fg given to a <span> is ignored, that run would render in
     // the default colour. The label is left out on the footer row, which has no room
@@ -235,6 +237,8 @@ export default Plugin.define({
 
     // Cache hit: the last assistant message, with the previous one as the trend.
     // Same label column and bar width as the plan rows, so the bars line up.
+    // The total is dropped when the row would not fit (the slot has no width of
+    // its own, so totalFits() estimates it from the terminal).
     const HitRow = (props: { sessionID?: string }) => {
       const info = createMemo(() => {
         tick()
@@ -242,8 +246,6 @@ export default Plugin.define({
       })
       const hit = () => info()?.hit
       const total = () => info()?.total
-      const trendFg = (trend: number) =>
-        trend > 0 ? hitColor(context.theme, 100) : trend < 0 ? hitColor(context.theme, 0) : muted()
       return (
         <Show when={cfg().columns.hit && hit() !== undefined}>
           <box flexDirection="row" gap={0}>
@@ -251,9 +253,14 @@ export default Plugin.define({
             <text fg={hitColor(context.theme, hit()!)}>{bar(hit()!, cfg().bar.cells, cfg().bar.glyphs)}</text>
             <text fg={hitColor(context.theme, hit()!)}>{" " + cachePercent(hit()!)}</text>
             <Show when={info()?.trend !== undefined}>
-              <text fg={trendFg(info()!.trend!)}>{" " + cacheTrend(info()!.trend)}</text>
+              <text fg={trendColor(info()!.trend!)}>{" " + cacheTrend(info()!.trend)}</text>
             </Show>
-            <Show when={cfg().columns.hitTotal && total() !== undefined}>
+            <Show
+              when={
+                total() !== undefined &&
+                totalFits(process.stdout.columns ?? 0, cfg().bar.cells, info()?.trend !== undefined)
+              }
+            >
               <text fg={muted()}>{" \u00b7 " + cachePercent(total()!)}</text>
             </Show>
           </box>
@@ -354,6 +361,17 @@ export default Plugin.define({
               <text fg={accent()}>{col("cost") + USD.format(spent())}</text>
             </Show>
           </Show>
+          <Show when={info()?.hit !== undefined}>
+            <text>{" "}</text>
+            <text fg={cfg().accentLabels ? accent() : muted()}>{"Cache"}</text>
+            <text fg={hitColor(context.theme, info()!.hit!)}>{col("hit") + cachePercent(info()!.hit!)}</text>
+            <Show when={info()?.trend !== undefined}>
+              <text fg={trendColor(info()!.trend!)}>{col("trend") + cacheTrend(info()!.trend)}</text>
+            </Show>
+            <Show when={info()?.total !== undefined}>
+              <text fg={muted()}>{col("total") + cachePercent(info()!.total!)}</text>
+            </Show>
+          </Show>
           <text>{" "}</text>
           <text fg={cfg().accentLabels ? accent() : muted()} onMouseUp={openSettings}>
             {"Settings"}
@@ -418,7 +436,9 @@ export default Plugin.define({
                 <box onMouseUp={() => openDetail(props.sessionID)}>
                   <ContextRow sessionID={props.sessionID} cost label />
                 </box>
-                <HitRow sessionID={props.sessionID} />
+                <box onMouseUp={() => openDetail(props.sessionID)}>
+                  <HitRow sessionID={props.sessionID} />
+                </box>
                 <For each={shown()}>
                   {(row) => <PlanRow row={row} onDetail={() => openDetail(props.sessionID)} />}
                 </For>

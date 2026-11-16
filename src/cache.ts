@@ -58,3 +58,13 @@ export function cacheTrend(value: number | undefined): string {
   if (value === undefined || Math.abs(value) < 0.05) return "-"
   return (value > 0 ? "\u2191" : "\u2193") + Math.abs(value).toFixed(1) + "%"
 }
+
+// The sidebar slot reports only the session id, not its width. The host gives it
+// roughly a third of the terminal, so that is the budget used to decide whether
+// the session total fits after the trend. Row: label, bar, " 98.5%", " ↓0.9%",
+// " · 84.7%".
+export function totalFits(terminalWidth: number, cells: number, hasTrend: boolean): boolean {
+  const sidebar = Math.floor(terminalWidth * 0.3)
+  const row = 8 + cells + 6 + (hasTrend ? 6 : 0) + 8
+  return sidebar >= row
+}

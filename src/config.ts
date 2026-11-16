@@ -15,7 +15,7 @@ export type Config = {
   autoOpenWindows: string[]
   thresholds: { warning: number; error: number }
   bar: { cells: number; glyphs: Glyph }
-  columns: { percent: boolean; tokens: boolean; cost: boolean; reset: boolean; flag: boolean; hit: boolean; hitTotal: boolean }
+  columns: { percent: boolean; tokens: boolean; cost: boolean; reset: boolean; flag: boolean; hit: boolean }
   order: "fixed" | "projection"
   accentLabels: boolean
   refresh: { contextMs: number; planMs: number }
@@ -32,7 +32,7 @@ export const DEFAULTS: Config = {
   autoOpenWindows: [...WINDOW_LABELS],
   thresholds: { warning: 75, error: 90 },
   bar: { cells: 8, glyphs: "blocks" },
-  columns: { percent: true, tokens: true, cost: true, reset: true, flag: true, hit: true, hitTotal: true },
+  columns: { percent: true, tokens: true, cost: true, reset: true, flag: true, hit: true },
   order: "fixed",
   accentLabels: true,
   refresh: { contextMs: 3_000, planMs: 60_000 },
@@ -68,7 +68,6 @@ function pickColumns(raw: any): Config["columns"] {
     reset: pickBool(raw?.reset, DEFAULTS.columns.reset),
     flag: pickBool(raw?.flag, DEFAULTS.columns.flag),
     hit: pickBool(raw?.hit, DEFAULTS.columns.hit),
-    hitTotal: pickBool(raw?.hitTotal, DEFAULTS.columns.hitTotal),
   }
 }
 
@@ -209,7 +208,6 @@ export function optionKeys(cfg: Config): string[] {
     "columns.reset",
     "columns.flag",
     "columns.hit",
-    "columns.hitTotal",
     "refresh.contextMs",
     "refresh.planMs",
     "projectionMinElapsed",

@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test"
-import { cacheHit, cachePercent, cacheTrend } from "../src/cache"
+import { cacheHit, cachePercent, cacheTrend, totalFits } from "../src/cache"
 
 const assistant = (id: string, input: number, read: number, write = 0) => ({
   id,
@@ -36,6 +36,13 @@ test("no assistant tokens means no row", () => {
   expect(cacheHit([{ id: "u", type: "user" }])).toBeUndefined()
   expect(cacheHit([])).toBeUndefined()
   expect(cacheHit([{ id: "a", type: "assistant", tokens: { input: 0, cache: { read: 0, write: 0 } } }])).toBeUndefined()
+})
+
+test("the total only shows when the sidebar has room", () => {
+  expect(totalFits(160, 8, true)).toBe(true)
+  expect(totalFits(120, 8, true)).toBe(true)
+  expect(totalFits(100, 8, true)).toBe(false)
+  expect(totalFits(100, 8, false)).toBe(true)
 })
 
 test("percent and trend keep the token-cache formatting", () => {
