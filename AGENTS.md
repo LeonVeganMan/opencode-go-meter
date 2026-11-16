@@ -8,7 +8,7 @@ OpenCode Go subscription.
 
 - `tui.tsx` — the plugin: `Plugin.define({ id, setup(context) })`. Exposed as the package's `./tui` export.
 - `settings.tsx` — settings panel.
-- `src/config.ts`, `src/rows.ts`, `src/usage.ts`, `src/windows.ts` — data and formatting, no TUI imports.
+- `src/config.ts`, `src/rows.ts`, `src/usage.ts`, `src/windows.ts`, `src/cache.ts` — data and formatting, no TUI imports.
 - `src/*.test.ts` — `bun test` (30 tests).
 - `assets/` — panel artwork shipped in the package.
 

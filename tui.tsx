@@ -4,6 +4,7 @@ import { Plugin } from "@opencode/plugin/tui"
 import { DEFAULTS, loadConfig, pollingNeeded, saveConfig, type Config, type Glyph } from "./src/config"
 import { alerting, buildRows, orderRows, type Row } from "./src/rows"
 import { fetchUsageResult, readAuthKey } from "./src/usage"
+import { cacheHit, cachePercent, cacheTrend } from "./src/cache"
 import { Settings } from "./settings"
 
 // Local TUI plugin: one "Context & Go" block, the session's context usage as the
@@ -45,6 +46,15 @@ function thresholdColor(theme: any, percent: number, thresholds: Thresholds): st
   if (percent >= thresholds.error) return pick(f.error, "#ff6b6b")
   if (percent >= thresholds.warning) return pick(f.warning, "#ffcc66")
   return pick(f.success, "#7fd37f")
+}
+
+function hitColor(theme: any, hit: number): string {
+  const f = theme?.text?.feedback ?? {}
+  const pick = (c: any, fallback: string) => c?.base ?? c?.default ?? fallback
+  // A high cache hit is good, the opposite of the Go plan thresholds.
+  if (hit >= 85) return pick(f.success, "#7fd37f")
+  if (hit >= 70) return pick(f.warning, "#ffcc66")
+  return pick(f.error, "#ff6b6b")
 }
 
 function compact(n: number): string {
@@ -123,6 +133,7 @@ function read(context: any, sessionID?: string) {
       m.providerID === last.model?.providerID && (m.id === last.model?.id || m.modelID === last.model?.id),
   )
   const limit = info?.limit?.context
+  const cache = cacheHit(messages, session?.tokens, revertID)
   // The window and the model name are not for the sidebar row, which has no room
   // for them, but for the detail dialog.
   return {
@@ -130,6 +141,9 @@ function read(context: any, sessionID?: string) {
     percent: limit ? Math.round((used / limit) * 100) : undefined,
     window: limit,
     model: info?.name ?? last.model?.id,
+    hit: cache?.hit,
+    trend: cache?.trend,
+    total: cache?.total,
   }
 }
 
@@ -213,6 +227,34 @@ export default Plugin.define({
             </Show>
             <Show when={cfg().columns.cost && spent() > 0}>
               <text fg={accent()}>{" " + USD.format(spent())}</text>
+            </Show>
+          </box>
+        </Show>
+      )
+    }
+
+    // Cache hit: the last assistant message, with the previous one as the trend.
+    // Same label column and bar width as the plan rows, so the bars line up.
+    const HitRow = (props: { sessionID?: string }) => {
+      const info = createMemo(() => {
+        tick()
+        return read(context, props.sessionID)
+      })
+      const hit = () => info()?.hit
+      const total = () => info()?.total
+      const trendFg = (trend: number) =>
+        trend > 0 ? hitColor(context.theme, 100) : trend < 0 ? hitColor(context.theme, 0) : muted()
+      return (
+        <Show when={cfg().columns.hit && hit() !== undefined}>
+          <box flexDirection="row" gap={0}>
+            <text>{col("hit")}</text>
+            <text fg={hitColor(context.theme, hit()!)}>{bar(hit()!, cfg().bar.cells, cfg().bar.glyphs)}</text>
+            <text fg={hitColor(context.theme, hit()!)}>{" " + cachePercent(hit()!)}</text>
+            <Show when={info()?.trend !== undefined}>
+              <text fg={trendFg(info()!.trend!)}>{" " + cacheTrend(info()!.trend)}</text>
+            </Show>
+            <Show when={cfg().columns.hitTotal && total() !== undefined}>
+              <text fg={muted()}>{" \u00b7 " + cachePercent(total()!)}</text>
             </Show>
           </box>
         </Show>
@@ -376,6 +418,7 @@ export default Plugin.define({
                 <box onMouseUp={() => openDetail(props.sessionID)}>
                   <ContextRow sessionID={props.sessionID} cost label />
                 </box>
+                <HitRow sessionID={props.sessionID} />
                 <For each={shown()}>
                   {(row) => <PlanRow row={row} onDetail={() => openDetail(props.sessionID)} />}
                 </For>
