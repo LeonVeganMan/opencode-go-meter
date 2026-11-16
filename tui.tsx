@@ -250,10 +250,12 @@ export default Plugin.define({
         <Show when={cfg().columns.hit && hit() !== undefined}>
           <box flexDirection="row" gap={0}>
             <text>{col("hit")}</text>
-            <text fg={hitColor(context.theme, hit()!)}>{bar(hit()!, cfg().bar.cells, cfg().bar.glyphs)}</text>
-            <text fg={hitColor(context.theme, hit()!)}>{" " + cachePercent(hit()!)}</text>
+            <text fg={hitColor(context.theme, hit() ?? 0)}>
+              {bar(hit() ?? 0, cfg().bar.cells, cfg().bar.glyphs)}
+            </text>
+            <text fg={hitColor(context.theme, hit() ?? 0)}>{" " + cachePercent(hit() ?? 0)}</text>
             <Show when={info()?.trend !== undefined}>
-              <text fg={trendColor(info()!.trend!)}>{" " + cacheTrend(info()!.trend)}</text>
+              <text fg={trendColor(info()?.trend ?? 0)}>{" " + cacheTrend(info()?.trend)}</text>
             </Show>
             <Show
               when={
@@ -261,7 +263,7 @@ export default Plugin.define({
                 totalFits(process.stdout.columns ?? 0, cfg().bar.cells, info()?.trend !== undefined)
               }
             >
-              <text fg={muted()}>{" \u00b7 " + cachePercent(total()!)}</text>
+              <text fg={muted()}>{" \u00b7 " + cachePercent(total() ?? 0)}</text>
             </Show>
           </box>
         </Show>
@@ -364,12 +366,14 @@ export default Plugin.define({
           <Show when={info()?.hit !== undefined}>
             <text>{" "}</text>
             <text fg={cfg().accentLabels ? accent() : muted()}>{"Cache"}</text>
-            <text fg={hitColor(context.theme, info()!.hit!)}>{col("hit") + cachePercent(info()!.hit!)}</text>
+            <text fg={hitColor(context.theme, info()?.hit ?? 0)}>
+              {col("hit") + cachePercent(info()?.hit ?? 0)}
+            </text>
             <Show when={info()?.trend !== undefined}>
-              <text fg={trendColor(info()!.trend!)}>{col("trend") + cacheTrend(info()!.trend)}</text>
+              <text fg={trendColor(info()?.trend ?? 0)}>{col("trend") + cacheTrend(info()?.trend)}</text>
             </Show>
             <Show when={info()?.total !== undefined}>
-              <text fg={muted()}>{col("total") + cachePercent(info()!.total!)}</text>
+              <text fg={muted()}>{col("total") + cachePercent(info()?.total ?? 0)}</text>
             </Show>
           </Show>
           <text>{" "}</text>
